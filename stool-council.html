@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stool Council</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#ffffff;--bg2:#f5f5f3;--bg3:#ebebea;
+  --text:#1a1a18;--text2:#6b6b68;--text3:#a0a09c;
+  --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.18);
+  --radius:12px;--radius-sm:8px;
+  --blue:#378ADD;--blue-bg:#E6F1FB;--blue-text:#0C447C;
+  --green:#639922;--green-bg:#EAF3DE;--green-text:#27500A;
+  --amber:#EF9F27;--amber-bg:#FAEEDA;--amber-text:#633806;
+  --pink:#D4537E;--pink-bg:#FBEAF0;--pink-text:#72243E;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1c1c1a;--bg2:#252523;--bg3:#2e2e2b;
+    --text:#f0f0ec;--text2:#a0a09c;--text3:#6b6b68;
+    --border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.18);
+    --blue-bg:#0c2540;--blue-text:#85B7EB;
+    --green-bg:#1a2e0a;--green-text:#C0DD97;
+    --amber-bg:#2e1f05;--amber-text:#FAC775;
+    --pink-bg:#2e0f1e;--pink-text:#ED93B1;
+  }
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh}
+
+/* Lock */
+#lock-screen{position:fixed;inset:0;background:var(--bg3);display:flex;align-items:center;justify-content:center;z-index:100}
+.lock-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:2rem;width:300px;text-align:center}
+.lock-card h1{font-size:20px;font-weight:500;margin-bottom:4px}
+.lock-card p{font-size:13px;color:var(--text2);margin-bottom:1.5rem}
+.lock-input{width:100%;padding:10px 14px;border-radius:var(--radius-sm);border:0.5px solid var(--border2);background:var(--bg2);color:var(--text);font-size:18px;text-align:center;letter-spacing:6px;margin-bottom:10px;outline:none}
+.lock-input:focus{border-color:var(--blue)}
+.lock-error{font-size:12px;color:#E24B4A;min-height:18px;margin-bottom:8px}
+.btn-primary{width:100%;padding:10px;border-radius:var(--radius-sm);border:none;background:var(--text);color:var(--bg);font-size:14px;font-weight:500;cursor:pointer}
+.btn-primary:hover{opacity:0.85}
+
+/* App */
+#app{display:none;max-width:600px;margin:0 auto;padding-bottom:4rem}
+.app-header{padding:1.25rem 1.25rem 0}
+.app-header h1{font-size:20px;font-weight:500}
+.app-header p{font-size:13px;color:var(--text2);margin-top:2px}
+.tabs{display:flex;gap:6px;padding:1rem 1.25rem;overflow-x:auto}
+button.tab{font-size:13px;padding:6px 16px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;white-space:nowrap}
+button.tab.active{background:var(--text);color:var(--bg);border-color:var(--text)}
+.view{padding:0 1.25rem;display:none}
+.view.active{display:block}
+.card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius);padding:1rem 1.25rem;margin-bottom:1rem}
+.card-label{font-size:11px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:.75rem}
+
+/* Pills */
+.pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1rem}
+.pill{font-size:13px;padding:6px 14px;border-radius:20px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer}
+.pill.sel-0{background:var(--blue-bg);color:var(--blue-text);border-color:var(--blue);font-weight:500}
+.pill.sel-1{background:var(--green-bg);color:var(--green-text);border-color:var(--green);font-weight:500}
+.pill.sel-2{background:var(--amber-bg);color:var(--amber-text);border-color:var(--amber);font-weight:500}
+.pill.sel-3{background:var(--pink-bg);color:var(--pink-text);border-color:var(--pink);font-weight:500}
+
+/* Slider */
+.slider-row{display:flex;align-items:center;gap:12px;margin-bottom:.5rem}
+.slider-row label{font-size:13px;color:var(--text2);min-width:44px}
+.slider-row input[type=range]{flex:1;accent-color:var(--blue)}
+.type-num{font-size:26px;font-weight:500;min-width:44px;text-align:right}
+.type-bar{height:8px;border-radius:4px;margin-bottom:.75rem;transition:background .2s}
+.type-desc{font-size:13px;color:var(--text2);margin-bottom:1rem;min-height:20px}
+.log-row{display:flex;align-items:center;gap:12px;margin-bottom:1rem}
+.log-btn{font-size:13px;padding:8px 22px;border-radius:var(--radius-sm);border:0.5px solid var(--border2);background:transparent;color:var(--text);cursor:pointer;font-weight:500}
+.log-btn:hover{background:var(--bg2)}
+.log-btn:active{transform:scale(.98)}
+.toast{font-size:13px;color:#3B6D11;opacity:0;transition:opacity .3s}
+.toast.show{opacity:1}
+
+/* Period tabs */
+.period-tabs{display:flex;gap:6px;margin-bottom:1rem;flex-wrap:wrap}
+button.ptab{font-size:12px;padding:4px 12px;border-radius:6px;border:0.5px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer}
+button.ptab.active{background:var(--bg2);color:var(--text);font-weight:500}
+
+/* Leaderboard */
+.lb-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.lb-row:last-child{border-bottom:none}
+.rank{font-size:18px;width:28px;text-align:center;flex-shrink:0}
+.avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0}
+.av0{background:var(--blue-bg);color:var(--blue-text)}
+.av1{background:var(--green-bg);color:var(--green-text)}
+.av2{background:var(--amber-bg);color:var(--amber-text)}
+.av3{background:var(--pink-bg);color:var(--pink-text)}
+.lb-meta{flex:1;min-width:0}
+.lb-name{font-size:14px;font-weight:500}
+.lb-sub{font-size:12px;color:var(--text2)}
+.lb-bar-wrap{width:100%;height:5px;background:var(--bg3);border-radius:3px;margin-top:5px}
+.lb-bar{height:5px;border-radius:3px}
+.lb-score{font-size:20px;font-weight:500;min-width:44px;text-align:right}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:1rem}
+.stat{background:var(--bg2);border-radius:var(--radius-sm);padding:.75rem 1rem}
+.stat-l{font-size:11px;color:var(--text2);margin-bottom:3px}
+.stat-v{font-size:22px;font-weight:500}
+.stat-s{font-size:11px;color:var(--text3)}
+
+/* Timeline */
+.tl-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)}
+.tl-row:last-child{border-bottom:none}
+.tl-time{font-size:12px;color:var(--text3);width:52px;flex-shrink:0}
+.type-badge{font-size:12px;font-weight:500;padding:2px 10px;border-radius:12px;flex-shrink:0}
+.tl-desc{font-size:12px;color:var(--text2)}
+
+/* Charts */
+.leg{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--text2)}
+.leg-dot{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle}
+.empty{font-size:13px;color:var(--text3);padding:1.5rem;text-align:center}
+.loading{font-size:13px;color:var(--text3);padding:.5rem 0}
+.refresh-btn{font-size:12px;color:var(--text2);background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px}
+.refresh-btn:hover{background:var(--bg2)}
+.err-msg{font-size:12px;color:#E24B4A;padding:.5rem 0}
+</style>
+</head>
+<body>
+
+<div id="lock-screen">
+  <div class="lock-card">
+    <h1>Stool Council</h1>
+    <p>Enter the passcode to continue</p>
+    <input class="lock-input" type="password" id="passcode-input" placeholder="•••••" maxlength="20" onkeydown="if(event.key==='Enter')tryUnlock()">
+    <div class="lock-error" id="lock-error"></div>
+    <button class="btn-primary" onclick="tryUnlock()">Enter</button>
+  </div>
+</div>
+
+<div id="app">
+  <div class="app-header">
+    <h1>Stool Council</h1>
+    <p>Tommy · Evan · Matt E · Matt Z</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="setView('log')">Log entry</button>
+    <button class="tab" onclick="setView('board')">Leaderboard</button>
+    <button class="tab" onclick="setView('charts')">Charts</button>
+    <button class="tab" onclick="setView('today')">Today</button>
+  </div>
+
+  <!-- LOG -->
+  <div class="view active" id="view-log">
+    <div class="card">
+      <div class="card-label">Who are you?</div>
+      <div class="pills">
+        <button class="pill" onclick="selectUser(0)">Tommy</button>
+        <button class="pill" onclick="selectUser(1)">Evan</button>
+        <button class="pill" onclick="selectUser(2)">Matt E</button>
+        <button class="pill" onclick="selectUser(3)">Matt Z</button>
+      </div>
+      <div class="card-label">Bristol type</div>
+      <div class="slider-row">
+        <label>Type</label>
+        <input type="range" min="1" max="7" step="0.1" value="4" id="type-slider" oninput="updateSlider(this.value)">
+        <span class="type-num" id="type-num">4.0</span>
+      </div>
+      <div class="type-bar" id="type-bar" style="background:#9FE1CB"></div>
+      <div class="type-desc" id="type-desc">Smooth, soft sausage — ideal</div>
+    </div>
+    <div class="log-row">
+      <button class="log-btn" onclick="logEntry()">Log it</button>
+      <span class="toast" id="toast">Logged!</span>
+    </div>
+    <div class="err-msg" id="log-err"></div>
+  </div>
+
+  <!-- LEADERBOARD -->
+  <div class="view" id="view-board">
+    <div class="period-tabs">
+      <button class="ptab active" onclick="setBoardPeriod('today')">Today</button>
+      <button class="ptab" onclick="setBoardPeriod('week')">7 days</button>
+      <button class="ptab" onclick="setBoardPeriod('month')">30 days</button>
+      <button class="ptab" onclick="setBoardPeriod('all')">All time</button>
+    </div>
+    <div class="card" id="lb-card"><div class="loading">Loading...</div></div>
+    <div class="card">
+      <div class="card-label">Scoring</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7">Distance from ideal type 4. Score of 0.00 = perfect. Lower wins.</div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="view" id="view-charts">
+    <div class="period-tabs">
+      <button class="ptab active" onclick="setChartPeriod('week')">7 days</button>
+      <button class="ptab" onclick="setChartPeriod('month')">30 days</button>
+    </div>
+    <div class="card">
+      <div class="card-label">Average type over time</div>
+      <div class="leg" id="line-legend"></div>
+      <div style="position:relative;width:100%;height:240px">
+        <canvas id="lineChart" role="img" aria-label="Bristol type trends per person">Chart</canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Type distribution — all time</div>
+      <div class="leg" id="dist-legend"></div>
+      <div style="position:relative;width:100%;height:200px">
+        <canvas id="distChart" role="img" aria-label="Type distribution per person">Chart</canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- TODAY -->
+  <div class="view" id="view-today">
+    <div class="stats-grid" id="today-stats"></div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <div class="card-label" style="margin-bottom:0">Today's log</div>
+        <button class="refresh-btn" onclick="renderToday()">↻ Refresh</button>
+      </div>
+      <div id="today-list"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://cbgydfsekwjbciozvwcc.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNiZ3lkZnNla3dqYmNpb3p2d2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyMzI3NjEsImV4cCI6MjA5NDgwODc2MX0.y5H6i-qvhGmgPuH6Z1bS61R1PSd2c8YTb4nAywmw9Vk';
+const PASSCODE = 'STOOL';
+
+const NAMES = ['Tommy','Evan','Matt E','Matt Z'];
+const USER_COLORS = ['#378ADD','#639922','#EF9F27','#D4537E'];
+const USER_COLORS_LIGHT = ['#E6F1FB','#EAF3DE','#FAEEDA','#FBEAF0'];
+const TYPE_DESCS = {
+  1:'Separate hard lumps — severe constipation',
+  2:'Lumpy sausage-shaped — mild constipation',
+  3:'Sausage with cracks — normal',
+  4:'Smooth, soft sausage — ideal',
+  5:'Soft blobs, clear edges — lacking fiber',
+  6:'Fluffy, mushy pieces — mild diarrhea',
+  7:'Watery, no solids — severe diarrhea'
+};
+const TYPE_COLORS = ['','#F09595','#FAC775','#C0DD97','#9FE1CB','#C0DD97','#FAC775','#F09595'];
+const TYPE_TEXT   = ['','#A32D2D','#854F0B','#3B6D11','#0F6E56','#3B6D11','#854F0B','#A32D2D'];
+
+let sb = null;
+let selUser = -1;
+let selType = 4.0;
+let boardPeriod = 'today';
+let chartPeriod = 'week';
+let lineChart = null;
+let distChart = null;
+
+function typeColor(t){ return TYPE_COLORS[Math.min(7,Math.max(1,Math.round(t)))]; }
+function typeText(t){ return TYPE_TEXT[Math.min(7,Math.max(1,Math.round(t)))]; }
+function typeDesc(t){ return TYPE_DESCS[Math.min(7,Math.max(1,Math.round(t)))]; }
+
+function dayStart(d){
+  const x = new Date(d);
+  x.setHours(0,0,0,0);
+  return x.toISOString();
+}
+function todayISO(){ return dayStart(new Date()); }
+function daysAgoISO(n){
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  d.setHours(0,0,0,0);
+  return d.toISOString();
+}
+function dayKey(iso){
+  const d = new Date(iso);
+  return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();
+}
+function todayKey(){ return dayKey(new Date().toISOString()); }
+
+function tryUnlock(){
+  const v = document.getElementById('passcode-input').value.trim().toUpperCase();
+  if(v === PASSCODE){
+    document.getElementById('lock-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  } else {
+    document.getElementById('lock-error').textContent = 'Wrong passcode — try again.';
+    document.getElementById('passcode-input').value = '';
+  }
+}
+
+function updateSlider(v){
+  selType = parseFloat(v);
+  document.getElementById('type-num').textContent = selType.toFixed(1);
+  document.getElementById('type-desc').textContent = typeDesc(selType);
+  document.getElementById('type-bar').style.background = typeColor(selType);
+}
+
+function selectUser(i){
+  selUser = i;
+  document.querySelectorAll('.pill').forEach((b,j)=>{
+    b.className = 'pill' + (j===i ? ' sel-'+i : '');
+  });
+}
+
+async function logEntry(){
+  document.getElementById('log-err').textContent = '';
+  if(selUser < 0){ document.getElementById('log-err').textContent = 'Pick your name first.'; return; }
+  if(!sb){ document.getElementById('log-err').textContent = 'Not connected — refresh and log in again.'; return; }
+  const { error } = await sb.from('entries').insert({
+    user_index: selUser,
+    type: parseFloat(selType.toFixed(1))
+  });
+  if(error){
+    document.getElementById('log-err').textContent = 'Save failed: ' + error.message;
+    return;
+  }
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 2000);
+}
+
+function setView(v){
+  document.querySelectorAll('.view').forEach(el=> el.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('.tab').forEach((b,i)=>{
+    b.classList.toggle('active', ['log','board','charts','today'][i] === v);
+  });
+  if(v === 'board') renderBoard();
+  if(v === 'charts') renderCharts();
+  if(v === 'today') renderToday();
+}
+
+function setBoardPeriod(p){
+  boardPeriod = p;
+  document.querySelectorAll('#view-board .ptab').forEach((b,i)=>{
+    b.classList.toggle('active', ['today','week','month','all'][i] === p);
+  });
+  renderBoard();
+}
+
+function setChartPeriod(p){
+  chartPeriod = p;
+  document.querySelectorAll('#view-charts .ptab').forEach((b,i)=>{
+    b.classList.toggle('active', ['week','month'][i] === p);
+  });
+  renderCharts();
+}
+
+async function fetchEntries(since){
+  if(!sb) return [];
+  let q = sb.from('entries').select('*').order('logged_at', { ascending: true });
+  if(since) q = q.gte('logged_at', since);
+  const { data, error } = await q;
+  if(error){ console.error('Fetch error:', error.message); return []; }
+  return data || [];
+}
+
+async function renderBoard(){
+  const card = document.getElementById('lb-card');
+  card.innerHTML = '<div class="loading">Loading...</div>';
+  const since = boardPeriod==='today' ? todayISO()
+              : boardPeriod==='week'  ? daysAgoISO(7)
+              : boardPeriod==='month' ? daysAgoISO(30)
+              : null;
+  const entries = await fetchEntries(since);
+  const rows = NAMES.map((n,i)=>{
+    const ue = entries.filter(e => e.user_index === i);
+    const avg = ue.length ? ue.reduce((s,e)=> s + parseFloat(e.type), 0) / ue.length : null;
+    return { name:n, idx:i, avg, count:ue.length, score: avg !== null ? Math.abs(avg - 4) : null };
+  }).filter(d => d.avg !== null).sort((a,b) => a.score - b.score);
+
+  if(!rows.length){ card.innerHTML = '<div class="empty">No entries for this period yet.</div>'; return; }
+  const maxScore = Math.max(...rows.map(d => d.score), 0.01);
+  const medals = ['🥇','🥈','🥉','4th'];
+  card.innerHTML = rows.map((d,rank) => `
+    <div class="lb-row">
+      <span class="rank">${medals[rank] || (rank+1)}</span>
+      <div class="avatar av${d.idx}">${d.name.split(' ').map(w=>w[0]).join('')}</div>
+      <div class="lb-meta">
+        <div class="lb-name">${d.name}</div>
+        <div class="lb-sub">avg ${d.avg.toFixed(1)} &nbsp;·&nbsp; ${d.count} log${d.count!==1?'s':''}</div>
+        <div class="lb-bar-wrap">
+          <div class="lb-bar" style="width:${Math.round((1 - d.score/maxScore)*100)}%;background:${USER_COLORS[d.idx]}"></div>
+        </div>
+      </div>
+      <div class="lb-score" style="color:${USER_COLORS[d.idx]}">${d.score.toFixed(2)}</div>
+    </div>`).join('');
+}
+
+async function renderCharts(){
+  const days = chartPeriod === 'week' ? 7 : 30;
+  const entries = await fetchEntries(daysAgoISO(days));
+  const allEntries = await fetchEntries(null);
+
+  const labels = [];
+  for(let i = days-1; i >= 0; i--){
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    labels.push({
+      key: dayKey(d.toISOString()),
+      label: days === 7
+        ? d.toLocaleDateString([], {weekday:'short'})
+        : (d.getDate() + '/' + (d.getMonth()+1))
+    });
+  }
+
+  const isDark = matchMedia('(prefers-color-scheme:dark)').matches;
+  const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
+  const tickColor = isDark ? '#a0a09c' : '#6b6b68';
+
+  const lineDatasets = NAMES.map((n,i) => ({
+    label: n,
+    data: labels.map(l => {
+      const es = entries.filter(e => e.user_index===i && dayKey(e.logged_at)===l.key);
+      return es.length ? parseFloat((es.reduce((s,e)=> s+parseFloat(e.type),0)/es.length).toFixed(2)) : null;
+    }),
+    borderColor: USER_COLORS[i],
+    backgroundColor: USER_COLORS_LIGHT[i],
+    borderWidth: 2, pointRadius: 4, tension: 0.3, spanGaps: true
+  }));
+
+  document.getElementById('line-legend').innerHTML = NAMES.map((n,i)=>
+    `<span><span class="leg-dot" style="background:${USER_COLORS[i]}"></span>${n}</span>`).join('');
+  document.getElementById('dist-legend').innerHTML = NAMES.map((n,i)=>
+    `<span><span class="leg-dot" style="background:${USER_COLORS[i]}"></span>${n}</span>`).join('');
+
+  if(lineChart) lineChart.destroy();
+  lineChart = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: { labels: labels.map(l=>l.label), datasets: lineDatasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        y: { min:1, max:7, ticks:{ stepSize:1, color:tickColor }, grid:{ color:gridColor } },
+        x: { ticks:{ autoSkip: days>14, maxRotation:45, color:tickColor }, grid:{ display:false } }
+      },
+      plugins: {
+        legend: { display:false },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) : '—'}` } }
+      }
+    }
+  });
+
+  const buckets = [1,2,3,4,5,6,7];
+  if(distChart) distChart.destroy();
+  distChart = new Chart(document.getElementById('distChart'), {
+    type: 'bar',
+    data: {
+      labels: buckets.map(t => 'Type '+t),
+      datasets: NAMES.map((n,i) => ({
+        label: n,
+        data: buckets.map(t => allEntries.filter(e => e.user_index===i && Math.round(parseFloat(e.type))===t).length),
+        backgroundColor: USER_COLORS[i]
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { ticks:{ autoSkip:false, color:tickColor }, grid:{ display:false } },
+        y: { beginAtZero:true, ticks:{ stepSize:1, color:tickColor }, grid:{ color:gridColor } }
+      },
+      plugins: { legend:{ display:false } }
+    }
+  });
+}
+
+async function renderToday(){
+  const entries = await fetchEntries(todayISO());
+  const sorted = [...entries].sort((a,b) => new Date(a.logged_at) - new Date(b.logged_at));
+
+  document.getElementById('today-stats').innerHTML = NAMES.map((n,i) => {
+    const ue = sorted.filter(e => e.user_index===i);
+    const avg = ue.length ? (ue.reduce((s,e)=> s+parseFloat(e.type),0)/ue.length).toFixed(1) : '—';
+    return `<div class="stat">
+      <div class="stat-l">${n}</div>
+      <div class="stat-v" style="color:${ue.length ? USER_COLORS[i] : 'var(--text3)'}">${avg}</div>
+      <div class="stat-s">${ue.length} log${ue.length!==1?'s':''}</div>
+    </div>`;
+  }).join('');
+
+  const list = document.getElementById('today-list');
+  if(!sorted.length){ list.innerHTML = '<div class="empty">No entries yet today.</div>'; return; }
+  list.innerHTML = sorted.map(e => {
+    const tv = parseFloat(e.type);
+    const time = new Date(e.logged_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    return `<div class="tl-row">
+      <span class="tl-time">${time}</span>
+      <div class="avatar av${e.user_index}">${NAMES[e.user_index].split(' ').map(w=>w[0]).join('')}</div>
+      <span class="type-badge" style="background:${typeColor(tv)};color:${typeText(tv)}">Type ${tv.toFixed(1)}</span>
+      <span class="tl-desc">${typeDesc(tv)}</span>
+    </div>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
